@@ -11,7 +11,9 @@ export default class SampleJob implements IJob {
   }
 
   handle = (job?: Job) => {
-    console.log("job id in handle", job?.id);
+    if (job) {
+      console.log("In handle", job.name, job.id, job.data);
+    }
   };
 
   failed = (job?: Job): void => {
