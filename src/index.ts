@@ -2,21 +2,36 @@ import express, { Express } from "express";
 import serverConfig from "./config/server.config.js";
 import apiRouter from "./routes/index.js";
 import SampleWorker from "./workers/sample.worker.js";
-import sampleQueueProducer from "./producers/sampleQueue.producer.js";
+import serverAdapter from "./config/bullboard.config.js";
+import { submission_queue } from "./utils/constants.js";
+import SubmissionWorker from "./workers/submission.worker.js";
+import submissionQueueProducer from "./producers/submissionQueue.producer.js";
 
 const app: Express = express();
 
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(express.text());
+
 app.use("/api", apiRouter);
+app.use("/ui", serverAdapter.getRouter());
 
 app.listen(serverConfig.PORT, () => {
   console.log(`Server is running at ${serverConfig.PORT}`);
+  console.log(
+    `BullBoard dashboard running on: http://localhost:${serverConfig.PORT}/ui`,
+  );
+  SampleWorker("SampleQueue");
 
-  SampleWorker('SampleQueue');
-
-  sampleQueueProducer('SampleJob', {
-    name: 'Rudra',
-    company: 'Brane',
-    position: 'ASL',
-    location: 'Remote | Hry'
-  })
+  submissionQueueProducer({
+    submission1: {
+      language: "cpp",
+      code: "#include <iostream>\nusing namespace std;\nint main() { int a, b; cin >> a >> b; cout << a + b; return 0; }",
+      inputCase: "5 10",
+      outputCase: "15",
+      userId: "user_123",
+      submissionId: "sub_456",
+    },
+  });
+  SubmissionWorker(submission_queue);
 });
