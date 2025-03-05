@@ -24,26 +24,27 @@ app.listen(serverConfig.PORT, () => {
   SampleWorker("SampleQueue");
   submissionQueueProducer({
     submission1: {
-      language: "rust",
+      language: "java",
       outputCase: "50",
       inputCase: "3 4 5",
       code: `
-        use std::io;
+        import java.util.Scanner;
 
-        fn main() {
-            let mut input = String::new();
-            io::stdin().read_line(&mut input).unwrap();
+public class Main {
+    public static void main(String[] args) {
+        Scanner scanner = new Scanner(System.in);
+        String[] numbers = scanner.nextLine().split(" ");
+        int sumOfSquares = 0;
 
-            let numbers: Vec<i32> = input
-                .trim()
-                .split_whitespace()
-                .map(|num| num.parse().unwrap())
-                .collect();
-
-            let sum_of_squares: i32 = numbers.iter().map(|&x| x * x).sum();
-            
-            println!("{}", sum_of_squares);
+        for (String num : numbers) {
+            int value = Integer.parseInt(num);
+            sumOfSquares += value * value;
         }
+
+        System.out.println(sumOfSquares);
+        scanner.close();
+    }
+}
     `,
     },
   });

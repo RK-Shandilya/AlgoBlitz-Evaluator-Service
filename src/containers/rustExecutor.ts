@@ -51,12 +51,7 @@ export default class RustExecutor implements CodeExecutorStrategy {
       }
       return { output: error as string, status: "ERROR" };
     } finally {
-      try {
-        await rustDockerContainer.stop().catch(() => {});
-        await rustDockerContainer.remove().catch(() => {});
-      } catch (error) {
-        console.error("Error while removing container:", error);
-      }
+      await rustDockerContainer.remove();
     }
   }
   fetchDecodeStream(

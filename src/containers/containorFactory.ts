@@ -15,7 +15,6 @@ export default async function createContainer(
     Tty: false,
     HostConfig: {
       Memory: 2 * 1024 * 1024 * 1024, // 2GB
-      AutoRemove: true,
     },
     OpenStdin: true,
   });

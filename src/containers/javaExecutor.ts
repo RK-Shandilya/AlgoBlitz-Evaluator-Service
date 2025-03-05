@@ -54,12 +54,7 @@ export default class JavaExecutor implements CodeExecutorStrategy {
       }
       return { output: error as string, status: "ERROR" };
     } finally {
-      try {
-        await javaDockerContainer.stop().catch(() => {}); // Ignore stop errors if already stopped
-        await javaDockerContainer.remove().catch(() => {});
-      } catch (error) {
-        console.error("Error while removing container:", error);
-      }
+      await javaDockerContainer.remove();
     }
   }
 

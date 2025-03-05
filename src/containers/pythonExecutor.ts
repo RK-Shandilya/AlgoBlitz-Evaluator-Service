@@ -49,12 +49,7 @@ export default class PythonExecutor implements CodeExecutorStrategy {
       }
       return { output: error as string, status: "ERROR" };
     } finally {
-      try {
-        await pythonContainer.stop().catch(() => {});
-        await pythonContainer.remove().catch(() => {});
-      } catch (error) {
-        console.error("Error while removing container:", error);
-      }
+      await pythonContainer.remove();
     }
   }
   fetchDecodeStream(
