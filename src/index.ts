@@ -22,15 +22,29 @@ app.listen(serverConfig.PORT, () => {
     `BullBoard dashboard running on: http://localhost:${serverConfig.PORT}/ui`,
   );
   SampleWorker("SampleQueue");
-
   submissionQueueProducer({
     submission1: {
-      language: "cpp",
-      code: "#include <iostream>\nusing namespace std;\nint main() { int a, b; cin >> a >> b; cout << a + b; return 0; }",
-      inputCase: "5 10",
-      outputCase: "15",
-      userId: "user_123",
-      submissionId: "sub_456",
+      language: "rust",
+      outputCase: "50",
+      inputCase: "3 4 5",
+      code: `
+        use std::io;
+
+        fn main() {
+            let mut input = String::new();
+            io::stdin().read_line(&mut input).unwrap();
+
+            let numbers: Vec<i32> = input
+                .trim()
+                .split_whitespace()
+                .map(|num| num.parse().unwrap())
+                .collect();
+
+            let sum_of_squares: i32 = numbers.iter().map(|&x| x * x).sum();
+            
+            println!("{}", sum_of_squares);
+        }
+    `,
     },
   });
   SubmissionWorker(submission_queue);
