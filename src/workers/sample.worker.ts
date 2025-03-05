@@ -1,6 +1,6 @@
 import { Job, Worker } from "bullmq";
-import SampleJob from "../jobs/sample.job";
-import redisConnection from "../config/redis.config";
+import SampleJob from "../jobs/sample.job.js";
+import redisConnection from "../config/redis.config.js";
 
 export default function SampleWorker(queueName: string) {
   new Worker(

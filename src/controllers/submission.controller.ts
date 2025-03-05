@@ -2,7 +2,7 @@ import { Request, Response } from "express";
 import {
   createSubmissionDto,
   createSubmissionZodSchema,
-} from "../dtos/createSubmission.dto";
+} from "../dtos/createSubmission.dto.js";
 
 export function addSubmission(req: Request, res: Response) {
   const result = createSubmissionZodSchema.safeParse(req.body);

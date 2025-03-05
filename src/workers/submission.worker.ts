@@ -1,6 +1,6 @@
 import { Job, Worker } from "bullmq";
-import SubmissionJob from "../jobs/submission.job";
-import redisConnection from "../config/redis.config";
+import SubmissionJob from "../jobs/submission.job.js";
+import redisConnection from "../config/redis.config.js";
 
 export default function SubmissionWorker(queueName: string) {
   new Worker(
@@ -9,7 +9,7 @@ export default function SubmissionWorker(queueName: string) {
       console.log(job.name);
       if (job.name === "SubmissionJob") {
         const submissionJobInstance = new SubmissionJob(job.data);
-        console.log("Calling job handler");
+        // console.log("Calling job handler");
         submissionJobInstance.handle(job);
         return true;
       }

@@ -1,9 +1,9 @@
 import { Job } from "bullmq";
-import { IJob } from "../types/bullMqJobDefinition";
-import { SubmissionPayload } from "../types/submissionPayload";
-import createExecutor from "../utils/executorFactory";
-import { ExecutionResponse } from "../types/codeExecutorStrategy";
-import evaluationQueueProducer from "../producers/evaluationQueue.producer";
+import { IJob } from "../types/bullMqJobDefinition.js";
+import { SubmissionPayload } from "../types/submissionPayload.js";
+import createExecutor from "../utils/executorFactory.js";
+import { ExecutionResponse } from "../types/codeExecutorStrategy.js";
+import evaluationQueueProducer from "../producers/evaluationQueue.producer.js";
 
 export default class SubmissionJob implements IJob {
   payload: Record<string, SubmissionPayload>;

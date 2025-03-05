@@ -1,5 +1,5 @@
-import DockerStreamOutput from "../types/dockerStreamOutput";
-import { DOCKER_STREAM_HEADER_SIZE } from "../utils/constants";
+import DockerStreamOutput from "../types/dockerStreamOutput.js";
+import { DOCKER_STREAM_HEADER_SIZE } from "../utils/constants.js";
 
 export default function decodeDockerStream(buffer: Buffer): DockerStreamOutput {
   let offset = 0;

@@ -1,5 +1,5 @@
 import Redis from "ioredis";
-import config from "./server.config";
+import config from "./server.config.js";
 
 const redisConfig = {
   port: Number(config.REDIS_PORT),

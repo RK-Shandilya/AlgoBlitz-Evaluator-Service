@@ -1,10 +1,10 @@
 import CodeExecutorStrategy, {
   ExecutionResponse,
-} from "../types/codeExecutorStrategy";
-import { JAVA_IMAGE } from "../utils/constants";
-import createContainer from "./containorFactory";
-import pullImage from "./pullImage";
-import decodeDockerStream from "./dockerHelper";
+} from "../types/codeExecutorStrategy.js";
+import { JAVA_IMAGE } from "../utils/constants.js";
+import createContainer from "./containorFactory.js";
+import pullImage from "./pullImage.js";
+import fetchDecodeStream from "../utils/fetchDecodedStream.js";
 
 export default class JavaExecutor implements CodeExecutorStrategy {
   async execute(
@@ -37,7 +37,7 @@ export default class JavaExecutor implements CodeExecutorStrategy {
       rawLogBuffer.push(chunk);
     });
     try {
-      const codeResponse: string = await this.fetchDecodeStream(
+      const codeResponse: string = await fetchDecodeStream(
         loggerStream,
         rawLogBuffer,
       );
@@ -57,27 +57,4 @@ export default class JavaExecutor implements CodeExecutorStrategy {
       await javaDockerContainer.remove();
     }
   }
-
-  fetchDecodeStream = (
-    loggerStream: NodeJS.ReadableStream,
-    rawLogBuffer: Buffer[],
-  ): Promise<string> => {
-    return new Promise((res, rej) => {
-      const timeout = setTimeout(() => {
-        console.log("timeout called");
-        rej("TLE");
-      }, 2000);
-      loggerStream.on("end", () => {
-        clearTimeout(timeout);
-        console.log(rawLogBuffer);
-        const completeBuffer = Buffer.concat(rawLogBuffer);
-        const decodedStream = decodeDockerStream(completeBuffer);
-        if (decodedStream.stderr) {
-          rej(decodedStream.stderr);
-        } else {
-          res(decodedStream.stdout);
-        }
-      });
-    });
-  };
 }

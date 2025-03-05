@@ -1,5 +1,5 @@
 import { Job } from "bullmq";
-import { IJob } from "../types/bullMqJobDefinition";
+import { IJob } from "../types/bullMqJobDefinition.js";
 
 export default class SampleJob implements IJob {
   name: string;

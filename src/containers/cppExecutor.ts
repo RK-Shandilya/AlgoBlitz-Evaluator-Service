@@ -1,10 +1,10 @@
-import { CPP_IMAGE } from "../utils/constants";
+import { CPP_IMAGE } from "../utils/constants.js";
 import CodeExecutorStrategy, {
   ExecutionResponse,
-} from "../types/codeExecutorStrategy";
-import pullImage from "./pullImage";
-import createContainer from "./containorFactory";
-import decodeDockerStream from "./dockerHelper";
+} from "../types/codeExecutorStrategy.js";
+import pullImage from "./pullImage.js";
+import createContainer from "./containorFactory.js";
+import fetchDecodeStream from "../utils/fetchDecodedStream.js";
 
 export default class CPPExecutor implements CodeExecutorStrategy {
   async execute(
@@ -33,7 +33,7 @@ export default class CPPExecutor implements CodeExecutorStrategy {
       rawLogBuffer.push(chunk);
     });
     try {
-      const codeResponse: string = await this.fetchDecodeStream(
+      const codeResponse: string = await fetchDecodeStream(
         loggerStream,
         rawLogBuffer,
       );
@@ -50,37 +50,7 @@ export default class CPPExecutor implements CodeExecutorStrategy {
       }
       return { output: error as string, status: "ERROR" };
     } finally {
-      try {
-        await cppDockerContainer.stop().catch(() => {}); // Ignore stop errors if already stopped
-        await cppDockerContainer.remove().catch(() => {});
-      } catch (error) {
-        console.error("Error while removing container:", error);
-      }
+      await cppDockerContainer.remove();
     }
-  }
-
-  fetchDecodeStream(
-    loggerStream: NodeJS.ReadableStream,
-    rawLogBuffer: Buffer[],
-  ): Promise<string> {
-    return new Promise((res, rej) => {
-      const timeout = setTimeout(() => {
-        console.log("Timeout Called");
-        rej("TLE");
-      }, 2000);
-      loggerStream.on("end", () => {
-        clearTimeout(timeout);
-        console.log(rawLogBuffer);
-        const completeBuffer = Buffer.concat(rawLogBuffer);
-        console.log(completeBuffer);
-        const decodedStream = decodeDockerStream(completeBuffer);
-        console.log("decodedStream", decodedStream);
-        if (decodedStream.stderr) {
-          rej(decodedStream.stderr);
-        } else {
-          res(decodedStream.stdout);
-        }
-      });
-    });
   }
 }
