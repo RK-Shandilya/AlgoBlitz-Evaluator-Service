@@ -29,7 +29,6 @@ export default class SubmissionJob implements IJob {
           inputTestCase,
           outputTestCase,
         );
-        console.log("response", response);
 
         evaluationQueueProducer({
           response,

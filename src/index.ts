@@ -5,7 +5,6 @@ import SampleWorker from "./workers/sample.worker.js";
 import serverAdapter from "./config/bullboard.config.js";
 import { submission_queue } from "./utils/constants.js";
 import SubmissionWorker from "./workers/submission.worker.js";
-import submissionQueueProducer from "./producers/submissionQueue.producer.js";
 
 const app = express();
 
@@ -21,17 +20,6 @@ app.listen(serverConfig.PORT, async () => {
   console.log(
     `BullBoard dashboard running on: http://localhost:${serverConfig.PORT}/ui`,
   );
-  console.log("hrllo");
   SampleWorker("SampleQueue");
-  submissionQueueProducer({
-    submission1: {
-      language: "javascript",
-      inputCase: "3 4",
-      outputCase: "7",
-      code: `
-      console.log(3+4)
-      `,
-    },
-  });
   SubmissionWorker(submission_queue);
 });

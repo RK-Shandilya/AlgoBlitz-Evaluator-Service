@@ -11,11 +11,8 @@ export default function fetchDecodeStream(
     }, 2000);
     loggerStream.on("end", () => {
       clearTimeout(timeout);
-      console.log(rawLogBuffer);
       const completeBuffer = Buffer.concat(rawLogBuffer);
-      console.log(completeBuffer);
       const decodedStream = decodeDockerStream(completeBuffer);
-      console.log("decodedStream", decodedStream);
       if (decodedStream.stderr) {
         rej(decodedStream.stderr);
       } else {
