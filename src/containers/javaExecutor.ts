@@ -12,15 +12,10 @@ export default class JavaExecutor implements CodeExecutorStrategy {
     inputTestCase: string,
     outputTestCase: string,
   ): Promise<ExecutionResponse> {
-    console.log("Java Executor Called");
-    console.log(code, inputTestCase, outputTestCase);
 
     const rawLogBuffer: Buffer[] = [];
     await pullImage(JAVA_IMAGE);
-    console.log("Initialising a new java docker container");
-    console.log(`Code received is \n ${code.replace(/'/g, `'\\"`)}`);
     const runCommand = `echo '${code.replace(/'/g, `'\\"`)}' > Main.java && javac Main.java && echo '${inputTestCase.replace(/'/g, `'\\"`)}' | java Main`;
-    console.log(runCommand);
     const javaDockerContainer = await createContainer(JAVA_IMAGE, [
       "/bin/sh",
       "-c",

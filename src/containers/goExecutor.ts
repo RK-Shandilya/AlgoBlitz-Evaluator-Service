@@ -41,7 +41,6 @@ echo "${inputTestCase}" | ./Main
         loggerStream,
         rawLogBuffer,
       );
-      console.log("codeResponse", codeResponse);
       if (codeResponse.trim() === outputTestCase.trim()) {
         return { output: codeResponse, status: "SUCCESS" };
       } else {

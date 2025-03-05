@@ -36,7 +36,6 @@ export default class PythonExecutor implements CodeExecutorStrategy {
         loggerStream,
         rawLogBuffer,
       );
-      console.log("codeResponse", codeResponse);
       if (codeResponse.trim() === outputTestCase.trim()) {
         return { output: codeResponse, status: "SUCCESS" };
       } else {

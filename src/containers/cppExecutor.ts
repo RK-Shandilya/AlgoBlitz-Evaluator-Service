@@ -12,7 +12,6 @@ export default class CPPExecutor implements CodeExecutorStrategy {
     inputTestCase: string,
     outputTestCase: string,
   ): Promise<ExecutionResponse> {
-    console.log(code, inputTestCase, outputTestCase);
     const rawLogBuffer: Buffer[] = [];
     await pullImage(CPP_IMAGE);
     const runCommand = `echo '${code.replace(/'/g, `'\\"`)}' > Main.cpp && g++ -o Main Main.cpp || exit 1 && echo '${inputTestCase.replace(/'/g, `'\\"`)}' | ./Main`;
@@ -22,7 +21,6 @@ export default class CPPExecutor implements CodeExecutorStrategy {
       runCommand,
     ]);
     await cppDockerContainer.start();
-    console.log("Started the docker container");
     const loggerStream = await cppDockerContainer.logs({
       stdout: true,
       stderr: true,
@@ -37,7 +35,6 @@ export default class CPPExecutor implements CodeExecutorStrategy {
         loggerStream,
         rawLogBuffer,
       );
-      console.log("codeResponse", codeResponse);
       if (codeResponse.trim() === outputTestCase.trim()) {
         return { output: codeResponse, status: "SUCCESS" };
       } else {
