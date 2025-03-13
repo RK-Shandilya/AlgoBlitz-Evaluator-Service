@@ -1,55 +1,147 @@
+import { JAVA_IMAGE } from "../utils/constants.js";
 import CodeExecutorStrategy, {
   ExecutionResponse,
 } from "../types/codeExecutorStrategy.js";
-import { JAVA_IMAGE } from "../utils/constants.js";
-import createContainer from "./containorFactory.js";
 import pullImage from "./pullImage.js";
+import createContainer from "./containorFactory.js";
+import { TestCase } from "../types/testCases.js";
+import * as fs from "fs/promises";
+import * as path from "path";
+import * as os from "os";
+import { ContainerCreateOptions } from "dockerode";
 import fetchDecodeStream from "../utils/fetchDecodedStream.js";
 
 export default class JavaExecutor implements CodeExecutorStrategy {
   async execute(
     code: string,
-    inputTestCase: string,
-    outputTestCase: string,
+    testCases: TestCase[],
   ): Promise<ExecutionResponse> {
+    console.log(testCases);
+    let tempDir = "";
+    let javaDockerContainer = null;
 
-    const rawLogBuffer: Buffer[] = [];
-    await pullImage(JAVA_IMAGE);
-    const runCommand = `echo '${code.replace(/'/g, `'\\"`)}' > Main.java && javac Main.java && echo '${inputTestCase.replace(/'/g, `'\\"`)}' | java Main`;
-    const javaDockerContainer = await createContainer(JAVA_IMAGE, [
-      "/bin/sh",
-      "-c",
-      runCommand,
-    ]);
-    await javaDockerContainer.start();
-    const loggerStream = await javaDockerContainer.logs({
-      stdout: true,
-      stderr: true,
-      timestamps: false,
-      follow: true,
-    });
-    loggerStream.on("data", (chunk) => {
-      rawLogBuffer.push(chunk);
-    });
     try {
-      const codeResponse: string = await fetchDecodeStream(
-        loggerStream,
-        rawLogBuffer,
+      await pullImage(JAVA_IMAGE);
+      tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "java-execution-"));
+
+      // Write code and download GSON
+      await fs.writeFile(path.join(tempDir, "SolutionRunner.java"), code, {
+        encoding: "utf8",
+      });
+      const gsonUrl =
+        "https://repo1.maven.org/maven2/com/google/code/gson/gson/2.8.9/gson-2.8.9.jar";
+      await fs.writeFile(
+        path.join(tempDir, "gson-2.8.9.jar"),
+        Buffer.from(await (await fetch(gsonUrl)).arrayBuffer()),
       );
 
-      if (codeResponse.trim() === outputTestCase.trim()) {
-        return { output: codeResponse, status: "SUCCESS" };
-      } else {
-        return { output: codeResponse, status: "WA" };
+      // Commands and container options
+      const compileCommand =
+        "cd /code && javac -cp .:gson-2.8.9.jar SolutionRunner.java";
+      const runCommand = "cd /code && java -cp .:gson-2.8.9.jar SolutionRunner";
+
+      const containerOptions: ContainerCreateOptions = {
+        Image: JAVA_IMAGE,
+        Cmd: ["/bin/sh", "-c", `${compileCommand} && ${runCommand}`],
+        HostConfig: {
+          Binds: [`${tempDir}:/code`],
+          Memory: 512 * 1024 * 1024,
+          MemorySwap: 512 * 1024 * 1024,
+          CpuPeriod: 100000,
+          CpuQuota: 75000,
+          Tmpfs: { "/tmp": "rw,noexec,nosuid,size=1g" },
+        },
+        Env: [
+          "JAVA_TOOL_OPTIONS=-XX:+UseG1GC -XX:MaxHeapFreeRatio=10 -XX:MinHeapFreeRatio=5",
+        ],
+      };
+
+      // Create, start container and get output
+      javaDockerContainer = await createContainer(
+        JAVA_IMAGE,
+        containerOptions.Cmd!,
+        containerOptions,
+      );
+      await javaDockerContainer.start();
+
+      const logStream = await javaDockerContainer.logs({
+        follow: true,
+        stdout: true,
+        stderr: true,
+      });
+      const rawLogBuffer: Buffer[] = [];
+      logStream.on("data", (chunk: Buffer) => rawLogBuffer.push(chunk));
+
+      const output = await fetchDecodeStream(logStream, rawLogBuffer);
+
+      const waitResult = await javaDockerContainer.wait();
+      if (waitResult.StatusCode !== 0) {
+        return {
+          output:
+            output || `Container exited with code ${waitResult.StatusCode}`,
+          status: "ERROR",
+        };
       }
-    } catch (error) {
-      console.log("Error occurred", error);
-      if (error === "TLE") {
-        await javaDockerContainer.kill();
+
+      if (!output.trim()) {
+        return {
+          output: "Container executed but produced no output",
+          status: "ERROR",
+        };
       }
-      return { output: error as string, status: "ERROR" };
+
+      return this.processOutput(output);
+    } catch (error: any) {
+      return {
+        output:
+          error === "TLE"
+            ? "Time Limit Exceeded"
+            : error.message || String(error),
+        status: "ERROR",
+      };
     } finally {
-      await javaDockerContainer.remove();
+      // Cleanup
+      if (javaDockerContainer) {
+        await javaDockerContainer.kill().catch(() => {});
+        await javaDockerContainer.remove({ force: true }).catch(() => {});
+      }
+      if (tempDir) {
+        await fs.rm(tempDir, { recursive: true, force: true }).catch(() => {});
+      }
+    }
+  }
+
+  private processOutput(output: string): ExecutionResponse {
+    try {
+      const cleanOutput = output.replace(/[\x00-\x1F\x7F]/g, "").trim();
+
+      try {
+        const results = JSON.parse(cleanOutput);
+
+        if (Array.isArray(results)) {
+          return {
+            output: cleanOutput,
+            status: results.every((result: any) => result.status === "PASSED")
+              ? "SUCCESS"
+              : "FAILED",
+          };
+        } else {
+          return {
+            output: `Expected an array of test results, but got: ${cleanOutput}`,
+            status: "ERROR",
+          };
+        }
+      } catch (jsonError) {
+        return {
+          output: `Error parsing results: ${cleanOutput}`,
+          status: "ERROR",
+        };
+      }
+    } catch (error: any) {
+      return {
+        output: `Error processing output: ${error.message || String(error)}`,
+        status: "ERROR",
+      };
     }
   }
 }

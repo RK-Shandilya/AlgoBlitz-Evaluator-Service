@@ -7,4 +7,6 @@ export const JAVASCRIPT_IMAGE = "node:20-alpine";
 
 export const submission_queue = "SubmissionQueue";
 
+export const EXECUTION_TIMEOUT = 10000;
+
 export const DOCKER_STREAM_HEADER_SIZE = 8;
