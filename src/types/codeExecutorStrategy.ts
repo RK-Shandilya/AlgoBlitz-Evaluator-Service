@@ -1,8 +1,11 @@
-import { TestCase } from "./testCases";
+import { TestCase } from "./testCases.js";
 
-export default interface CodeExecutorStrategy {
-  execute(code: string, testCases: TestCase[]): Promise<ExecutionResponse>;
-  //eslint-disable-next-line semi
+export interface CodeExecutorStrategy {
+  execute(code: string, testCases: TestCase[]): Promise<ExecutionResponse[]>;
 }
 
-export type ExecutionResponse = { output: string; status: string };
+export type ExecutionResponse = {
+  output: string;
+  status: string;
+  expectedOutput?: string;
+};

@@ -1,138 +1,120 @@
-import { CPP_IMAGE } from "../utils/constants.js";
-import CodeExecutorStrategy, {
+import {
+  CodeExecutorStrategy,
   ExecutionResponse,
 } from "../types/codeExecutorStrategy.js";
-import pullImage from "./pullImage.js";
-import createContainer from "./containorFactory.js";
 import { TestCase } from "../types/testCases.js";
-import * as fs from "fs/promises";
-import * as path from "path";
-import * as os from "os";
-import { ContainerCreateOptions } from "dockerode";
-import fetchDecodeStream from "../utils/fetchDecodedStream.js";
+import { CPP_IMAGE, CPP_TIME_LIMIT } from "../utils/constants.js";
+import fetchDecodedStream from "../utils/fetchDecodedStream.js";
+import createContainer from "./containorFactory.js";
+import pullImage from "./pullImage.js";
 
-export default class CppExecutor implements CodeExecutorStrategy {
+class CppExecutor implements CodeExecutorStrategy {
   async execute(
     code: string,
     testCases: TestCase[],
-  ): Promise<ExecutionResponse> {
-    console.log(testCases);
-    let tempDir = "";
-    let cppDockerContainer = null;
+  ): Promise<ExecutionResponse[]> {
+    const result: ExecutionResponse[] = [];
+    console.log("Pulling the c++ image");
+    await pullImage(CPP_IMAGE);
+
+    console.log("Initializing c++ container");
+
+    // Create a shell script that will compile and run all test cases
+    let shellScript = `echo '${code.replace(/'/g, `'\\"`)}' > main.cpp && g++ main.cpp -o main && `;
+
+    // Add commands to run each test case and output a separator between results
+    testCases.forEach((testCase, index) => {
+      shellScript += `echo "===TEST_CASE_${index}===" && `;
+      shellScript += `echo '${testCase.input.replace(/'/g, `'\\"`)}' | timeout ${CPP_TIME_LIMIT / 1000} ./main && `;
+      shellScript += `echo "===END_TEST_CASE_${index}===" && `;
+    });
+
+    // Remove the trailing '&& '
+    shellScript = shellScript.slice(0, -3);
+
+    const cppDockerContainer = await createContainer(CPP_IMAGE, [
+      "/bin/sh",
+      "-c",
+      shellScript,
+    ]);
 
     try {
-      await pullImage(CPP_IMAGE);
-      tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "cpp-execution-"));
-
-      // Write code and nlohmann/json header
-      await fs.writeFile(path.join(tempDir, "solution.cpp"), code, {
-        encoding: "utf8",
-      });
-
-      // Commands and container options
-      const compileCommand =
-        "cd /code && g++ -std=c++17 -o solution solution.cpp";
-      const runCommand = "cd /code && ./solution";
-
-      const containerOptions: ContainerCreateOptions = {
-        Image: CPP_IMAGE,
-        Cmd: ["/bin/sh", "-c", `${compileCommand} && ${runCommand}`],
-        HostConfig: {
-          Binds: [`${tempDir}:/code`],
-          Memory: 512 * 1024 * 1024,
-          MemorySwap: 512 * 1024 * 1024,
-          CpuPeriod: 100000,
-          CpuQuota: 75000,
-          Tmpfs: { "/tmp": "rw,noexec,nosuid,size=1g" },
-        },
-      };
-
-      // Create, start container and get output
-      cppDockerContainer = await createContainer(
-        CPP_IMAGE,
-        containerOptions.Cmd!,
-        containerOptions,
-      );
       await cppDockerContainer.start();
+      console.log("Starting the container");
 
-      const logStream = await cppDockerContainer.logs({
-        follow: true,
+      const rawLogBuffer: Buffer[] = [];
+      const loggerStream = await cppDockerContainer.logs({
         stdout: true,
         stderr: true,
+        timestamps: false,
+        follow: true,
       });
-      const rawLogBuffer: Buffer[] = [];
-      logStream.on("data", (chunk: Buffer) => rawLogBuffer.push(chunk));
 
-      const output = await fetchDecodeStream(logStream, rawLogBuffer);
+      loggerStream.on("data", (chunk: Buffer) => {
+        rawLogBuffer.push(chunk);
+      });
 
-      const waitResult = await cppDockerContainer.wait();
-      if (waitResult.StatusCode !== 0) {
-        return {
-          output:
-            output || `Container exited with code ${waitResult.StatusCode}`,
-          status: "ERROR",
-        };
-      }
+      const completeOutput = await fetchDecodedStream(
+        loggerStream,
+        rawLogBuffer,
+        CPP_TIME_LIMIT * testCases.length,
+      );
 
-      if (!output.trim()) {
-        return {
-          output: "Container executed but produced no output",
-          status: "ERROR",
-        };
-      }
+      // Process the output to extract results for each test case
+      let currentOutput = "";
+      let currentTestCase = -1;
 
-      return this.processOutput(output);
-    } catch (error: any) {
-      return {
-        output:
-          error === "TLE"
-            ? "Time Limit Exceeded"
-            : error.message || String(error),
-        status: "ERROR",
-      };
-    } finally {
-      // Cleanup
-      if (cppDockerContainer) {
-        await cppDockerContainer.kill().catch(() => {});
-        await cppDockerContainer.remove({ force: true }).catch(() => {});
-      }
-      if (tempDir) {
-        await fs.rm(tempDir, { recursive: true, force: true }).catch(() => {});
-      }
-    }
-  }
-
-  private processOutput(output: string): ExecutionResponse {
-    try {
-      const cleanOutput = output.replace(/[\x00-\x1F\x7F]/g, "").trim();
-
-      try {
-        const results = JSON.parse(cleanOutput);
-
-        if (Array.isArray(results)) {
-          return {
-            output: cleanOutput,
-            status: results.every((result: any) => result.status === "PASSED")
-              ? "SUCCESS"
-              : "FAILED",
-          };
-        } else {
-          return {
-            output: `Expected an array of test results, but got: ${cleanOutput}`,
-            status: "ERROR",
-          };
+      const lines = completeOutput.split("\n");
+      for (const line of lines) {
+        if (line.startsWith("===TEST_CASE_")) {
+          currentTestCase = parseInt(
+            line.replace("===TEST_CASE_", "").replace("===", ""),
+          );
+          currentOutput = "";
+        } else if (line.startsWith("===END_TEST_CASE_")) {
+          const testCaseIndex = parseInt(
+            line.replace("===END_TEST_CASE_", "").replace("===", ""),
+          );
+          if (
+            testCaseIndex === currentTestCase &&
+            currentTestCase < testCases.length
+          ) {
+            const expectedOutput = testCases[currentTestCase].output.trim();
+            if (currentOutput.trim() === expectedOutput) {
+              result.push({
+                output: currentOutput.trim(),
+                status: "SUCCESS",
+                expectedOutput,
+              });
+            } else {
+              result.push({
+                output: currentOutput.trim(),
+                status: "WA",
+                expectedOutput,
+              });
+            }
+          }
+        } else if (currentTestCase >= 0) {
+          currentOutput += line + "\n";
         }
-      } catch (jsonError) {
-        return {
-          output: `Error parsing results: ${cleanOutput}`,
-          status: "ERROR",
-        };
       }
-    } catch (error: any) {
-      return {
-        output: `Error processing output: ${error.message || String(error)}`,
-        status: "ERROR",
-      };
+
+      // Fill in any missing results (e.g., if a test case timed out)
+      while (result.length < testCases.length) {
+        result.push({ output: "TLE", status: "ERROR" });
+      }
+    } catch (error) {
+      // Handle any container-wide errors
+      console.error(`Container execution error: ${error}`);
+      while (result.length < testCases.length) {
+        result.push({ output: "MLE", status: "ERROR" });
+      }
+    } finally {
+      await cppDockerContainer.remove();
     }
+
+    return result;
   }
 }
+
+export default CppExecutor;

@@ -1,23 +1,26 @@
-import decodeDockerStream from "../containers/dockerHelper.js";
+import decodeDockerStream from "./decodeDockerStream.js";
 
-export default function fetchDecodeStream(
+const fetchDecodedStream = (
   loggerStream: NodeJS.ReadableStream,
   rawLogBuffer: Buffer[],
-): Promise<string> {
+  timeLimit: number,
+): Promise<string> => {
   return new Promise((res, rej) => {
-    const timeout = setTimeout(() => {
-      console.log("Timeout Called");
+    const timeOut = setTimeout(() => {
+      console.log("Time out called");
       rej("TLE");
-    }, 2000);
+    }, timeLimit);
     loggerStream.on("end", () => {
-      clearTimeout(timeout);
+      clearTimeout(timeOut);
       const completeBuffer = Buffer.concat(rawLogBuffer);
       const decodedStream = decodeDockerStream(completeBuffer);
-      if (decodedStream.stderr) {
-        rej(decodedStream.stderr);
-      } else {
+      if (decodedStream.stdout) {
         res(decodedStream.stdout);
+      } else {
+        rej(decodedStream.stderr);
       }
     });
   });
-}
+};
+
+export default fetchDecodedStream;
