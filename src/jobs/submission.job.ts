@@ -23,12 +23,46 @@ export default class SubmissionJob implements IJob {
       const userId = this.payload[key].userId;
       const submissionId = this.payload[key].submissionId;
       const testCases = this.payload[key].testCases;
+      const isCustomTest = this.payload[key].isCustomTest || false;
       const strategy = createExecutor(language);
 
       if (strategy != null) {
-        const response = await strategy.execute(code, testCases);
+        let response;
+        if (isCustomTest) {
+          const customTestCases = JSON.parse(JSON.stringify(testCases));
+          const referenceSolutionCode = this.payload[key].refrenceSolution;
+          if (referenceSolutionCode) {
+            const referenceResults = await strategy.execute(
+              referenceSolutionCode,
+              customTestCases,
+              false,
+            );
+            for (let i = 0; i < customTestCases.length; i++) {
+              if (i < referenceResults.length) {
+                customTestCases[i].output = referenceResults[i].output;
+              }
+            }
+            response = await strategy.execute(code, customTestCases, true);
+          } else {
+            response = await strategy.execute(code, customTestCases, true);
+            for (const result of response) {
+              result.status = "SUCCESS";
+              delete result.expectedOutput;
+            }
+          }
+        } else {
+          response = await strategy.execute(code, testCases, false);
+          await evaluationQueueProducer({ response, userId, submissionId });
+        }
         console.info(JSON.stringify(response, null, 2));
-        await evaluationQueueProducer({ response, userId, submissionId });
+        if (isCustomTest) {
+          await evaluationQueueProducer({
+            response,
+            userId,
+            submissionId,
+            isCustomTest: true,
+          });
+        }
       }
     }
   };

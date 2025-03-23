@@ -6,4 +6,6 @@ export type SubmissionPayload = {
   testCases: TestCase[];
   userId: string;
   submissionId: string;
+  isCustomTest?: boolean;
+  refrenceSolution?: string;
 };
